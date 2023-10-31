@@ -2,11 +2,11 @@ package sqs
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/mitchellh/mapstructure"
 	"go.k6.io/k6/js/modules"
+	"log"
 	"os"
 )
 
@@ -17,41 +17,24 @@ func init() {
 type Sqs struct{}
 
 func (*Sqs) NewClient() *sqs.Client {
-	cfg, err := getAwsConfig()
-
-	if err != nil {
-		panic("configuration error, " + err.Error())
-	}
-
-	client := sqs.NewFromConfig(cfg)
-	return client
+	region := os.Getenv("AWS_REGION")
+	return sqs.NewFromConfig(aws.Config{Region: region})
 }
 
-func getAwsConfig() (aws.Config, error) {
-	awsEndpoint := os.Getenv("AWS_ENDPOINT")
-
-	if awsEndpoint != "" {
-		customResolver := aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
-			return aws.Endpoint{
-				PartitionID:   "aws",
-				URL:           awsEndpoint,
-				SigningRegion: region,
-			}, nil
-		})
-
-		cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithEndpointResolver(customResolver))
-		return cfg, err
+func (*Sqs) WriteEvent(ctx context.Context, client *sqs.Client, QueueUrl string, body interface{}) {
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	cfg, err := config.LoadDefaultConfig(context.TODO())
-	return cfg, err
-}
+	payload := string(bodyBytes)
+	params := &sqs.SendMessageInput{
+		MessageBody: &payload,
+		QueueUrl:    &QueueUrl,
+	}
 
-func (s *Sqs) Send(sqsClient *sqs.Client, messageInput interface{}) {
-	var sqsMessageInput sqs.SendMessageInput
-	_ = mapstructure.Decode(messageInput, &sqsMessageInput)
-	_, err := sqsClient.SendMessage(context.TODO(), &sqsMessageInput)
+	_, err = client.SendMessage(ctx, params)
 	if err != nil {
-		panic("unable to send  message, " + err.Error())
+		log.Fatal(err)
 	}
 }
