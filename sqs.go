@@ -2,9 +2,9 @@ package sqs
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/mitchellh/mapstructure"
 	"go.k6.io/k6/js/modules"
 	"log"
 	"os"
@@ -21,19 +21,10 @@ func (*Sqs) NewClient() *sqs.Client {
 	return sqs.NewFromConfig(aws.Config{Region: region})
 }
 
-func (*Sqs) WriteEvent(ctx context.Context, client *sqs.Client, QueueUrl string, body interface{}) {
-	bodyBytes, err := json.Marshal(body)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	payload := string(bodyBytes)
-	params := &sqs.SendMessageInput{
-		MessageBody: &payload,
-		QueueUrl:    &QueueUrl,
-	}
-
-	_, err = client.SendMessage(ctx, params)
+func (s *Sqs) Send(sqsClient *sqs.Client, params interface{}) {
+	var sqsMessageInput sqs.SendMessageInput
+	_ = mapstructure.Decode(params, &sqsMessageInput)
+	_, err := sqsClient.SendMessage(context.TODO(), &sqsMessageInput)
 	if err != nil {
 		log.Fatal(err)
 	}
