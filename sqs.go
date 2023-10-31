@@ -35,7 +35,7 @@ func getAwsConfig() (aws.Config, error) {
 			return aws.Endpoint{
 				PartitionID:   "aws",
 				URL:           awsEndpoint,
-				SigningRegion: "eu-west-1",
+				SigningRegion: region,
 			}, nil
 		})
 
